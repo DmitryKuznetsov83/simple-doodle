@@ -67,3 +67,32 @@ Rules:
   then reads events and checks the rules: no double booking, no deadlocks
 - **Core module** - the projection and booking rules are pure Java without Spring, shared by both apps
 
+## Things to improve
+
+- **Cached projections** - keep projections in a cache instead of replaying the log on every read.
+
+  ```mermaid
+  flowchart LR
+      client([Client]) --> gw[API Gateway]
+
+      gw -- "/calendar/**" --> cal[Calendar App]
+      gw -- "/booking/**" --> bkg[Booking App]
+
+      subgraph db [PostgreSQL]
+          event[(event)]
+          outbox[(outbox)]
+      end
+
+      bkg -- "one transaction:<br/>append events + outbox rows" --> db
+      outbox -- "1. poll new rows" --> proj[Projector]
+      proj -- "2. apply events,<br/>update snapshots" --> cache[(Cache)]
+      proj -. "3. delete processed rows" .-> outbox
+      cache -- reads --> cal
+  ```
+
+  Assumption: **reads use the cache only**, so the calendar may briefly lag behind writes;
+  booking rules are still checked against the database
+
+- **Meeting update / delete** - is a must for real product
+- **GraphQL instead of REST** - the API is command-based: nothing is ever updated or addressed by id,
+  only events are appended.
