@@ -1,5 +1,6 @@
 package org.example.doodle.calendar;
 
+import org.example.doodle.calendar.meeting.MeetingRepository;
 import org.example.doodle.calendar.user.UserCalendarRepository;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.jdbc.test.autoconfigure.JdbcTest;
@@ -20,6 +21,6 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @JdbcTest(properties = "spring.datasource.hikari.read-only=false")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({PostgresTestcontainer.class, UserCalendarRepository.class})
+@Import({PostgresTestcontainer.class, UserCalendarRepository.class, MeetingRepository.class})
 public @interface RepositoryTest {
 }

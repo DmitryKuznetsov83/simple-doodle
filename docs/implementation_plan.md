@@ -46,8 +46,10 @@
 - Tests: `@WebMvcTest` + Testcontainers for SQL
 
 ## 9. Calendar App: meeting
-- `GET /calendar/meetings/{meetingId}`
-  - Organizer, time and participants (`[{id, name}]`) are taken from the meeting's events
+- Read-only, SQL via `JdbcClient`, one query
+- `GET /calendar/meetings/{meetingId}` - organizer, time and participants are taken from the meeting's events
+  - Organizer is `creator_id`, participants (`[{id, name}]`) are `user_id`, organizer first
+  - No events for the meeting -> 404
 - Tests: `@WebMvcTest` + Testcontainers for SQL
 
 ## 10. Booking App: state transition rules
