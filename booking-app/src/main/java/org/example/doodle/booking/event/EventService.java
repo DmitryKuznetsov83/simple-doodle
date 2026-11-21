@@ -30,9 +30,7 @@ public class EventService {
     @Transactional
     public EventEntity mark(long userId, EventType eventType, TimeRange timeRange) {
         LocalDateTime now = LocalDateTime.now(clock);
-        if (!timeRange.startTime().isAfter(now)) {
-            throw new StartTimeInPastException(timeRange.startTime());
-        }
+        BookingRules.requireStartInFuture(timeRange, now);
         if (!userRepository.existsById(userId)) {
             throw new UserNotFoundException(userId);
         }
