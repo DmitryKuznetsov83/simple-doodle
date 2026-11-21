@@ -75,6 +75,7 @@
 - Configurable timeouts, no retries
 - docker-compose service; `8081` / `8082` stay exposed for debugging
 
-## 13. Metrics
+## 13. Documentation
+- README.md
 
-## 14. Documentation
+## 14. Metrics

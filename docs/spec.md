@@ -89,8 +89,11 @@ API fields are camelCase (`startTime`), database columns are snake_case (`start_
 
 | endpoint                       | parameters              | result                                                                                                  |
 |--------------------------------|-------------------------|---------------------------------------------------------------------------------------------------------|
-| `GET /calendar/users/{userId}`          | `startTime`, `endTime` (optional) | user (`id`, `name`) and user's calendar (projection of the event log) for `[startTime, endTime)`: list of intervals with their time state |
+| `GET /calendar/users/{userId}`          | `startTime`, `endTime` | user (`id`, `name`) and user's calendar (projection of the event log) for `[startTime, endTime)`: list of intervals with their time state |
 | `GET /calendar/meetings/{meetingId}`    | -                       | meeting (`title`, `description`, participants)                                                          |
+
+The calendar window `[startTime, endTime)` is limited to 31 days (`calendar.max-window`, configurable),
+a longer window -> 400 Bad Request.
 
 ## Event types and time states
 
