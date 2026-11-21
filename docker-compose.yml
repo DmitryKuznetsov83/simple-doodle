@@ -44,5 +44,20 @@ services:
       postgres:
         condition: service_healthy
 
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    environment:
+      BOOKING_URL: http://booking-app:8081
+      CALENDAR_URL: http://calendar-app:8082
+    ports:
+      - "8080:8080"
+    depends_on:
+      booking-app:
+        condition: service_started
+      calendar-app:
+        condition: service_started
+
 volumes:
   postgres-data:

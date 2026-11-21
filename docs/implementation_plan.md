@@ -70,10 +70,11 @@
 - Tests: lock query, service-level concurrency tests (same slot -> exactly one succeeds, no deadlocks)
 
 ## 12. Gateway
-- API Gateway routing
+- Module `gateway`: Spring Cloud Gateway Server WebMVC (`2025.1.x`), port `8080`
+- `/booking/**` -> booking-app, `/calendar/**` -> calendar-app; URLs via env, no path rewriting
+- Configurable timeouts, no retries
+- docker-compose service; `8081` / `8082` stay exposed for debugging
 
-## 13. End-to-end tests
+## 13. Metrics
 
-## 14. Metrics
-
-## 15. Documentation
+## 14. Documentation

@@ -5,6 +5,7 @@ COPY pom.xml .
 COPY core/pom.xml core/
 COPY booking-app/pom.xml booking-app/
 COPY calendar-app/pom.xml calendar-app/
+COPY gateway/pom.xml gateway/
 RUN mvn -B -q -pl calendar-app -am dependency:go-offline
 COPY core/src core/src
 COPY calendar-app/src calendar-app/src
