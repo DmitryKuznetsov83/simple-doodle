@@ -5,7 +5,6 @@ import org.example.doodle.booking.ProjectionConfig;
 import org.example.doodle.booking.event.EventEntity;
 import org.example.doodle.booking.event.EventRepository;
 import org.example.doodle.booking.event.ProjectionLoader;
-import org.example.doodle.booking.user.User;
 import org.example.doodle.booking.user.UserRepository;
 import org.example.doodle.core.event.EventType;
 import org.junit.jupiter.api.Test;
@@ -26,7 +25,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.List;
-import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.AdditionalAnswers.returnsFirstArg;
@@ -76,8 +74,7 @@ class MeetingControllerTest {
     @Test
     @SuppressWarnings("unchecked")
     void booksMeetingForAllParticipantsIncludingOrganizer() throws Exception {
-        when(userRepository.existsById(ORGANIZER_ID)).thenReturn(true);
-        when(userRepository.findAllById(anyIterable())).thenAnswer(inv -> users(inv.getArgument(0)));
+        givenAllExist();
         givenAllFree();
         when(meetingRepository.save(any())).thenReturn(new MeetingEntity(MEETING_ID, "Sync", "Weekly"));
         when(eventRepository.saveAll(anyIterable())).then(returnsFirstArg());
@@ -101,8 +98,7 @@ class MeetingControllerTest {
     @Test
     @SuppressWarnings("unchecked")
     void emptyParticipantsBooksMeetingForOrganizerOnly() throws Exception {
-        when(userRepository.existsById(ORGANIZER_ID)).thenReturn(true);
-        when(userRepository.findAllById(anyIterable())).thenAnswer(inv -> users(inv.getArgument(0)));
+        givenAllExist();
         givenAllFree();
         when(meetingRepository.save(any())).thenReturn(new MeetingEntity(MEETING_ID, "Sync", "Weekly"));
         when(eventRepository.saveAll(anyIterable())).then(returnsFirstArg());
@@ -120,8 +116,7 @@ class MeetingControllerTest {
 
     @Test
     void rejectsParticipantsNotEntirelyFree() throws Exception {
-        when(userRepository.existsById(ORGANIZER_ID)).thenReturn(true);
-        when(userRepository.findAllById(anyIterable())).thenAnswer(inv -> users(inv.getArgument(0)));
+        givenAllExist();
         when(eventRepository.findOverlapping(anyCollection(), any(), any())).thenReturn(List.of(
                 // organizer (1): no events at all, i.e. busy
                 // 2: free, but part of the range is busy
@@ -144,9 +139,7 @@ class MeetingControllerTest {
 
     @Test
     void rejectsUnknownParticipants() throws Exception {
-        when(userRepository.existsById(ORGANIZER_ID)).thenReturn(true);
-        when(userRepository.findAllById(anyIterable()))
-                .thenReturn(List.of(new User(1L, "org"), new User(2L, "u2")));
+        when(userRepository.lockAllById(anyCollection())).thenReturn(List.of(1L, 2L));
 
         mvc.perform(post("/booking/users/{userId}/meetings", ORGANIZER_ID)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -159,7 +152,8 @@ class MeetingControllerTest {
 
     @Test
     void rejectsUnknownOrganizer() throws Exception {
-        when(userRepository.existsById(ORGANIZER_ID)).thenReturn(false);
+        // the participant exists, the organizer does not
+        when(userRepository.lockAllById(anyCollection())).thenReturn(List.of(2L));
 
         mvc.perform(post("/booking/users/{userId}/meetings", ORGANIZER_ID)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -171,7 +165,7 @@ class MeetingControllerTest {
 
     @Test
     void rejectsStartTimeNotInFuture() throws Exception {
-        when(userRepository.existsById(ORGANIZER_ID)).thenReturn(true);
+        givenAllExist();
 
         mvc.perform(post("/booking/users/{userId}/meetings", ORGANIZER_ID)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -183,7 +177,7 @@ class MeetingControllerTest {
 
     @Test
     void rejectsRangeNotAlignedToQuantum() throws Exception {
-        when(userRepository.existsById(ORGANIZER_ID)).thenReturn(true);
+        givenAllExist();
 
         mvc.perform(post("/booking/users/{userId}/meetings", ORGANIZER_ID)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -209,7 +203,7 @@ class MeetingControllerTest {
                     {"title": "Sync", "participantIds": [2], "startTime": "2026-11-22T10:00:00"}"""
     })
     void rejectsInvalidRequest(String body) throws Exception {
-        when(userRepository.existsById(ORGANIZER_ID)).thenReturn(true);
+        givenAllExist();
 
         mvc.perform(post("/booking/users/{userId}/meetings", ORGANIZER_ID)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -221,7 +215,7 @@ class MeetingControllerTest {
 
     @Test
     void rejectsTooLongTitle() throws Exception {
-        when(userRepository.existsById(ORGANIZER_ID)).thenReturn(true);
+        givenAllExist();
 
         mvc.perform(post("/booking/users/{userId}/meetings", ORGANIZER_ID)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -234,6 +228,14 @@ class MeetingControllerTest {
     private void verifyNothingSaved() {
         verify(meetingRepository, never()).save(any());
         verify(eventRepository, never()).saveAll(anyIterable());
+    }
+
+    /** Every requested user exists. */
+    private void givenAllExist() {
+        when(userRepository.lockAllById(anyCollection())).thenAnswer(inv -> {
+            Collection<Long> userIds = inv.getArgument(0);
+            return userIds.stream().sorted().toList();
+        });
     }
 
     /** Every requested user has marked 09:00-12:00 as free. */
@@ -256,12 +258,6 @@ class MeetingControllerTest {
 
     private static EventEntity meetingBooked(long userId) {
         return new EventEntity(null, ORGANIZER_ID, userId, EventType.MEETING_BOOKED, MEETING_ID, START, END, NOW);
-    }
-
-    private static List<User> users(Iterable<Long> ids) {
-        return StreamSupport.stream(ids.spliterator(), false)
-                .map(id -> new User(id, "user" + id))
-                .toList();
     }
 
     private static String body(String title, String participantIds, String startTime, String endTime) {

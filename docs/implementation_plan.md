@@ -63,9 +63,11 @@
 - Violation -> 409 Conflict; for a meeting - ids of participants who are not free
 - Tests: core unit tests of the rules, `@WebMvcTest` (201 / 409), Testcontainers for the new query
 
-## 11. Booking App: concurrency 
-- Lock `users` rows `ORDER BY id FOR UPDATE` at the start of the command transaction
-- Concurrency test: parallel bookings of the same slot -> exactly one succeeds
+## 11. Booking App: concurrency
+- Lock `users` rows `ORDER BY id FOR UPDATE` at the start of the command transaction (whole user, no `lock_timeout`)
+- The lock query replaces the existence checks
+- Isolation explicitly `READ_COMMITTED`: events are read after the lock, so they are fresh
+- Tests: lock query, service-level concurrency tests (same slot -> exactly one succeeds, no deadlocks)
 
 ## 12. Gateway
 - API Gateway routing

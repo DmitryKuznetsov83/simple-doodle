@@ -62,7 +62,7 @@ class EventControllerTest {
     @ParameterizedTest
     @CsvSource({"free, MARKED_FREE", "busy, MARKED_BUSY"})
     void appendsEventToOwnCalendar(String path, EventType expectedType) throws Exception {
-        when(userRepository.existsById(USER_ID)).thenReturn(true);
+        when(userRepository.lockAllById(List.of(USER_ID))).thenReturn(List.of(USER_ID));
         when(eventRepository.save(any())).then(returnsFirstArg());
 
         mvc.perform(post("/booking/users/{userId}/" + path, USER_ID)
@@ -82,7 +82,7 @@ class EventControllerTest {
     @ParameterizedTest
     @CsvSource({"free", "busy"})
     void rejectsRangeOverlappingMeeting(String path) throws Exception {
-        when(userRepository.existsById(USER_ID)).thenReturn(true);
+        when(userRepository.lockAllById(List.of(USER_ID))).thenReturn(List.of(USER_ID));
         when(eventRepository.findOverlapping(anyCollection(), any(), any())).thenReturn(List.of(
                 event(EventType.MARKED_FREE, null, 9, 0, 12, 0),
                 event(EventType.MEETING_BOOKED, 7L, 10, 15, 11, 0)));
@@ -99,7 +99,7 @@ class EventControllerTest {
 
     @Test
     void allowsRangeAdjacentToMeeting() throws Exception {
-        when(userRepository.existsById(USER_ID)).thenReturn(true);
+        when(userRepository.lockAllById(List.of(USER_ID))).thenReturn(List.of(USER_ID));
         when(eventRepository.findOverlapping(anyCollection(), any(), any())).thenReturn(List.of(
                 event(EventType.MEETING_BOOKED, 7L, 10, 30, 11, 0)));
         when(eventRepository.save(any())).then(returnsFirstArg());
@@ -112,7 +112,7 @@ class EventControllerTest {
 
     @Test
     void rejectsRangeNotAlignedToQuantum() throws Exception {
-        when(userRepository.existsById(USER_ID)).thenReturn(true);
+        when(userRepository.lockAllById(List.of(USER_ID))).thenReturn(List.of(USER_ID));
 
         mvc.perform(post("/booking/users/{userId}/free", USER_ID)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -124,7 +124,7 @@ class EventControllerTest {
 
     @Test
     void rejectsStartTimeNotInFuture() throws Exception {
-        when(userRepository.existsById(USER_ID)).thenReturn(true);
+        when(userRepository.lockAllById(List.of(USER_ID))).thenReturn(List.of(USER_ID));
 
         mvc.perform(post("/booking/users/{userId}/free", USER_ID)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -136,7 +136,7 @@ class EventControllerTest {
 
     @Test
     void rejectsUnknownUser() throws Exception {
-        when(userRepository.existsById(USER_ID)).thenReturn(false);
+        when(userRepository.lockAllById(List.of(USER_ID))).thenReturn(List.of());
 
         mvc.perform(post("/booking/users/{userId}/free", USER_ID)
                         .contentType(MediaType.APPLICATION_JSON)

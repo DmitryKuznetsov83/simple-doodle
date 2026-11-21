@@ -8,6 +8,7 @@ import org.example.doodle.core.projection.ProjectionInterval;
 import org.example.doodle.core.projection.TransitionRules;
 import org.example.doodle.core.time.TimeRange;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -37,11 +38,12 @@ public class EventService {
      *
      * @throws TimeRangeHasMeetingsException if the time range overlaps a meeting
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public EventEntity mark(long userId, EventType eventType, TimeRange timeRange) {
         LocalDateTime now = LocalDateTime.now(clock);
         BookingRules.requireStartInFuture(timeRange, now);
-        if (!userRepository.existsById(userId)) {
+        // the user's commands are serialized; events are read after the lock, so they are up to date
+        if (userRepository.lockAllById(List.of(userId)).isEmpty()) {
             throw new UserNotFoundException(userId);
         }
 

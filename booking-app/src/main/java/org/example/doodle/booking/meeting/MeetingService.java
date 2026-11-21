@@ -4,7 +4,6 @@ import org.example.doodle.booking.event.BookingRules;
 import org.example.doodle.booking.event.EventEntity;
 import org.example.doodle.booking.event.EventRepository;
 import org.example.doodle.booking.event.ProjectionLoader;
-import org.example.doodle.booking.user.User;
 import org.example.doodle.booking.user.UserNotFoundException;
 import org.example.doodle.booking.user.UserRepository;
 import org.example.doodle.core.event.EventType;
@@ -12,16 +11,17 @@ import org.example.doodle.core.projection.Projection;
 import org.example.doodle.core.projection.TransitionRules;
 import org.example.doodle.core.time.TimeRange;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 public class MeetingService {
@@ -47,19 +47,16 @@ public class MeetingService {
      *
      * @throws ParticipantsNotFreeException if the time range is not entirely free for some participants
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public MeetingResponse book(long organizerId, String title, String description,
                                 List<Long> participantIds, TimeRange timeRange) {
         LocalDateTime now = LocalDateTime.now(clock);
         BookingRules.requireStartInFuture(timeRange, now);
-        if (!userRepository.existsById(organizerId)) {
-            throw new UserNotFoundException(organizerId);
-        }
 
         Set<Long> participants = new LinkedHashSet<>();
         participants.add(organizerId);
         participants.addAll(participantIds);
-        requireAllExist(participants);
+        lockAllExisting(organizerId, participants);
         requireAllFree(participants, timeRange);
 
         MeetingEntity meeting = meetingRepository.save(new MeetingEntity(null, title, description));
@@ -85,12 +82,17 @@ public class MeetingService {
         }
     }
 
-    private void requireAllExist(Set<Long> userIds) {
-        Set<Long> existing = userRepository.findAllById(userIds).stream()
-                .map(User::id)
-                .collect(Collectors.toSet());
-        List<Long> missing = new ArrayList<>(userIds);
-        missing.removeAll(existing);
+    /**
+     * Locks all participants, so their commands are serialized; events are read after the lock,
+     * so they are up to date.
+     */
+    private void lockAllExisting(long organizerId, Set<Long> participants) {
+        Set<Long> locked = new HashSet<>(userRepository.lockAllById(participants));
+        if (!locked.contains(organizerId)) {
+            throw new UserNotFoundException(organizerId);
+        }
+        List<Long> missing = new ArrayList<>(participants);
+        missing.removeAll(locked);
         if (!missing.isEmpty()) {
             throw new ParticipantsNotFoundException(missing);
         }
