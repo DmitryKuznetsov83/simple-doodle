@@ -7,7 +7,7 @@
 ## 2. Database schema
 - Schema: tables, indexes, constraints
 
-## 3. Users
+## 3. Create user
 - User creation (controller -> service -> repo) in booking-app
 
 ## 4. Core records
