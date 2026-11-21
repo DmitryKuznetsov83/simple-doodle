@@ -55,6 +55,13 @@
 ## 10. Booking App: state transition rules
 - Apply business restriction before booking event
 - One transaction per command: load events -> projection -> check rules -> append events
+- Projection window = requested interval; rules (pure check in `core`):
+  - `MARKED_FREE` / `MARKED_BUSY`: no `MEETING` in the projection, partial overlap rejects the whole request
+  - `MEETING_BOOKED`: the projection is a single `FREE` interval for every participant, organizer included
+- Events of all participants in one query (`user_id IN (:ids)`, overlapping the interval, `ORDER BY id`)
+- Rules are checked before the `meeting` row is saved
+- Violation -> 409 Conflict; for a meeting - ids of participants who are not free
+- Tests: core unit tests of the rules, `@WebMvcTest` (201 / 409), Testcontainers for the new query
 
 ## 11. Booking App: concurrency 
 - Lock `users` rows `ORDER BY id FOR UPDATE` at the start of the command transaction

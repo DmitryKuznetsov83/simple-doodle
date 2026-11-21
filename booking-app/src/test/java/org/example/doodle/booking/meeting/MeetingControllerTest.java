@@ -1,8 +1,10 @@
 package org.example.doodle.booking.meeting;
 
 import org.example.doodle.booking.ApiExceptionHandler;
+import org.example.doodle.booking.ProjectionConfig;
 import org.example.doodle.booking.event.EventEntity;
 import org.example.doodle.booking.event.EventRepository;
+import org.example.doodle.booking.event.ProjectionLoader;
 import org.example.doodle.booking.user.User;
 import org.example.doodle.booking.user.UserRepository;
 import org.example.doodle.core.event.EventType;
@@ -22,6 +24,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.StreamSupport;
 
@@ -29,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.AdditionalAnswers.returnsFirstArg;
 import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyIterable;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -38,7 +42,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(MeetingController.class)
-@Import({MeetingService.class, ApiExceptionHandler.class, MeetingControllerTest.FixedClock.class})
+@Import({MeetingService.class, ProjectionLoader.class, ProjectionConfig.class, ApiExceptionHandler.class,
+        MeetingControllerTest.FixedClock.class})
 class MeetingControllerTest {
 
     /** "Now" is 2026-11-21 12:00. */
@@ -73,6 +78,7 @@ class MeetingControllerTest {
     void booksMeetingForAllParticipantsIncludingOrganizer() throws Exception {
         when(userRepository.existsById(ORGANIZER_ID)).thenReturn(true);
         when(userRepository.findAllById(anyIterable())).thenAnswer(inv -> users(inv.getArgument(0)));
+        givenAllFree();
         when(meetingRepository.save(any())).thenReturn(new MeetingEntity(MEETING_ID, "Sync", "Weekly"));
         when(eventRepository.saveAll(anyIterable())).then(returnsFirstArg());
 
@@ -97,6 +103,7 @@ class MeetingControllerTest {
     void emptyParticipantsBooksMeetingForOrganizerOnly() throws Exception {
         when(userRepository.existsById(ORGANIZER_ID)).thenReturn(true);
         when(userRepository.findAllById(anyIterable())).thenAnswer(inv -> users(inv.getArgument(0)));
+        givenAllFree();
         when(meetingRepository.save(any())).thenReturn(new MeetingEntity(MEETING_ID, "Sync", "Weekly"));
         when(eventRepository.saveAll(anyIterable())).then(returnsFirstArg());
 
@@ -109,6 +116,30 @@ class MeetingControllerTest {
         var saved = forClass(Iterable.class);
         verify(eventRepository).saveAll(saved.capture());
         assertThat((Iterable<EventEntity>) saved.getValue()).containsExactly(meetingBooked(1));
+    }
+
+    @Test
+    void rejectsParticipantsNotEntirelyFree() throws Exception {
+        when(userRepository.existsById(ORGANIZER_ID)).thenReturn(true);
+        when(userRepository.findAllById(anyIterable())).thenAnswer(inv -> users(inv.getArgument(0)));
+        when(eventRepository.findOverlapping(anyCollection(), any(), any())).thenReturn(List.of(
+                // organizer (1): no events at all, i.e. busy
+                // 2: free, but part of the range is busy
+                event(2, EventType.MARKED_FREE, null, 9, 0, 12, 0),
+                event(2, EventType.MARKED_BUSY, null, 10, 45, 11, 0),
+                // 3: free except for another meeting
+                event(3, EventType.MARKED_FREE, null, 9, 0, 12, 0),
+                event(3, EventType.MEETING_BOOKED, 7L, 10, 0, 10, 15),
+                // 4: free
+                event(4, EventType.MARKED_FREE, null, 10, 0, 11, 0)));
+
+        mvc.perform(post("/booking/users/{userId}/meetings", ORGANIZER_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body("Sync", "[2, 3, 4]", "2026-11-22T10:00:00", "2026-11-22T11:00:00")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("[1, 2, 3]")));
+
+        verifyNothingSaved();
     }
 
     @Test
@@ -203,6 +234,24 @@ class MeetingControllerTest {
     private void verifyNothingSaved() {
         verify(meetingRepository, never()).save(any());
         verify(eventRepository, never()).saveAll(anyIterable());
+    }
+
+    /** Every requested user has marked 09:00-12:00 as free. */
+    private void givenAllFree() {
+        when(eventRepository.findOverlapping(anyCollection(), any(), any())).thenAnswer(inv -> {
+            Collection<Long> userIds = inv.getArgument(0);
+            return userIds.stream()
+                    .map(userId -> event(userId, EventType.MARKED_FREE, null, 9, 0, 12, 0))
+                    .toList();
+        });
+    }
+
+    private static EventEntity event(long userId, EventType eventType, Long meetingId,
+                                     int startHour, int startMinute, int endHour, int endMinute) {
+        return new EventEntity(null, userId, userId, eventType, meetingId,
+                LocalDateTime.of(2026, 11, 22, startHour, startMinute),
+                LocalDateTime.of(2026, 11, 22, endHour, endMinute),
+                LocalDateTime.of(2026, 11, 20, 12, 0));
     }
 
     private static EventEntity meetingBooked(long userId) {

@@ -1,6 +1,8 @@
 package org.example.doodle.booking.event;
 
+import org.example.doodle.core.event.Event;
 import org.example.doodle.core.event.EventType;
+import org.example.doodle.core.time.TimeRange;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Table;
 
@@ -23,4 +25,8 @@ public record EventEntity(
         LocalDateTime startTime,
         LocalDateTime endTime,
         LocalDateTime createdAt) {
+
+    public Event toEvent() {
+        return new Event(eventType, new TimeRange(startTime, endTime), meetingId);
+    }
 }
