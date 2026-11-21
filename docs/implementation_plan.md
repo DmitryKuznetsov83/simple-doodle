@@ -11,10 +11,14 @@
 - User creation (controller -> service -> repo) in booking-app
 
 ## 4. Core records
-- `TimeRange` + validation
-- `EventType`
-- `TimeState`
-- `Projection` 
+- Pure Java, no Spring; invariants are validated in constructors
+- These records are the internal domain model, not DTOs
+- `TimeRange` - (startTime, endTime)
+- `TimeState` - `FREE`, `BUSY`, `MEETING`
+- `EventType` - `MARKED_FREE`, `MARKED_BUSY`, `MEETING_BOOKED`
+- `Event` - (eventType, timeRange, meetingId)
+- `Projection` - (window, intervals)
+- `ProjectionInterval` - (timeRange, state, meetingId)
 
 ## 5. Booking App: booking `FREE` and `BUSY` with trivial input validation
 - `POST /booking/users/{userId}/free`
